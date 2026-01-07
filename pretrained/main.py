@@ -15,6 +15,7 @@ from torchvision.transforms import ToPILImage
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 
+
 # =========================
 # 1) Model & preprocessing
 # =========================
@@ -25,12 +26,16 @@ def get_model_and_preprocess(device: Optional[str] = None, model_name: str = "si
     if model_name == "simclr_santi":
         print("SimCLR Santi")
         model, preprocess = load_simclr()
-        print(model)
-    elif model_name == "resnet50":
+        # print(model)
+    elif model_name == "resnet50v1":
+        print("ResNet50")
+        model = torchvision.models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
+        preprocess = ResNet50_Weights.IMAGENET1K_V1.transforms()
+    elif model_name == "resnet50v2":
         print("ResNet50")
         model = torchvision.models.resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
         preprocess = ResNet50_Weights.IMAGENET1K_V2.transforms()
-        print(model)
+        # print(model)
         # preprocess = transforms.Compose([
         #     transforms.Resize(256),
         #     transforms.CenterCrop(256),
@@ -813,71 +818,71 @@ if __name__ == "__main__":
     # layers = ["layer1.0.relu", "layer1.1.relu", "layer1.2.relu", "layer2.0.relu", "layer2.1.relu", "layer2.2.relu", "layer2.3.relu", "layer3.0.relu", "layer3.1.relu", "layer3.2.relu", "layer3.3.relu", "layer3.4.relu", "layer3.5.relu", "layer4.0.relu", "layer4.1.relu", "layer4.2.relu"]
     # # # 1) Build per-image vectors per layer (ReLU outputs → GAP)
     # #
-    model_name = "cipersimclr"
-    layers = ["layer1.0.relu", "layer2.0.relu", "layer3.0.relu", "layer4.0.relu", "layer4.1.relu", "layer4.2.relu"]
-    vectors_by_layer, paths, _ = layer_vectors_from_folder(
-        folder=r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\hue\images",
-        render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\hue\render_params.csv",
-        layer_names=layers,
-        limit=None,  # or None for all
-        model_name = model_name
-    )
-    vectors_by_layer2, paths2, _ = layer_vectors_from_folder(
-        r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\camera\images",
-        render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\camera\render_params.csv",
-        layer_names=layers,
-        limit=None,  # or None for all
-        model_name = model_name
-    )
-    # # rename layers to distinguish
-    vectors_by_layer = {f"{k}_hue": v for k, v in vectors_by_layer.items()}
-    vectors_by_layer2 = {f"{k}_cam": v for k, v in vectors_by_layer2.items()}
-    rdms = compute_rdms_for_layers(vectors_by_layer, metric="euclidean")
-    rdms2 = compute_rdms_for_layers(vectors_by_layer2, metric="euclidean")
-    R, names_A, names_B = cross_rsa_from_rdms(rdms, rdms2, method="pearson")
-    # plot_cross_rsa(R, names_A, names_B, title="Cross RSA Hue vs Camera (Pearson, Euclidean RDMs)")
+    # model_name = "cipersimclr"
+    # layers = ["layer1.0.relu", "layer2.0.relu", "layer3.0.relu", "layer4.0.relu", "layer4.1.relu", "layer4.2.relu"]
+    # vectors_by_layer, paths, _ = layer_vectors_from_folder(
+    #     folder=r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\hue\images",
+    #     render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\hue\render_params.csv",
+    #     layer_names=layers,
+    #     limit=None,  # or None for all
+    #     model_name = model_name
+    # )
+    # vectors_by_layer2, paths2, _ = layer_vectors_from_folder(
+    #     r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\camera\images",
+    #     render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\camera\render_params.csv",
+    #     layer_names=layers,
+    #     limit=None,  # or None for all
+    #     model_name = model_name
+    # )
+    # # # rename layers to distinguish
+    # vectors_by_layer = {f"{k}_hue": v for k, v in vectors_by_layer.items()}
+    # vectors_by_layer2 = {f"{k}_cam": v for k, v in vectors_by_layer2.items()}
+    # rdms = compute_rdms_for_layers(vectors_by_layer, metric="euclidean")
+    # rdms2 = compute_rdms_for_layers(vectors_by_layer2, metric="euclidean")
+    # R, names_A, names_B = cross_rsa_from_rdms(rdms, rdms2, method="pearson")
+    # # plot_cross_rsa(R, names_A, names_B, title="Cross RSA Hue vs Camera (Pearson, Euclidean RDMs)")
+    # #
+    # # # persistence diagram
+    # from ripser import ripser
+    # from persim import plot_diagrams, bottleneck
     #
-    # # persistence diagram
-    from ripser import ripser
-    from persim import plot_diagrams, bottleneck
-
-    emb_hue_dict = reduce_layers(vectors_by_layer, method="pca_then_isomap", n_components=2, return_embeddings=True)
-    emb_cam_dict = reduce_layers(vectors_by_layer2, method="pca_then_isomap", n_components=2, return_embeddings=True)
-
-    for key in emb_hue_dict.keys():
-        if not key.endswith("_hue"):
-            continue
-        base = key[:-4]  # entferne suffix "_hue"
-        cam_key = f"{base}_cam"
-        if cam_key not in emb_cam_dict:
-            print(f"[warn] missing {cam_key} in emb_cam_dict")
-            continue
-
-        emb_hue = emb_hue_dict[key]  # ndarray [N,2]
-        emb_cam = emb_cam_dict[cam_key]  # ndarray [N,2]
-
-        # # (Optional) center before topology to stabilize angle-based rings
-        # emb_hue = emb_hue - emb_hue.mean(axis=0, keepdims=True)
-        # emb_cam = emb_cam - emb_cam.mean(axis=0, keepdims=True)
-
-        # ---- 3) Persistent homology on 2D embeddings ----
-        res_hue = ripser(emb_hue, maxdim=1)
-        res_cam = ripser(emb_cam, maxdim=1)
-
-        # Plot Hue diagram
-        plot = plt.figure()
-        plot_diagrams(res_hue["dgms"])
-        plt.title(f"Persistence Diagram Hue - {base}")
-        plt.tight_layout()
-        plt.savefig(f'persistence_diagram_hue_{model_name}_{base}.png', dpi=300)
-        plot.show()
-
-        plot = plt.figure()
-        plot_diagrams(res_cam["dgms"])
-        plt.title(f"Persistence Diagram Camera - {base}")
-        plt.tight_layout()
-        plt.savefig(f'persistence_diagram_camera_{model_name}_{base}.png', dpi=300)
-        plot.show()
+    # emb_hue_dict = reduce_layers(vectors_by_layer, method="pca_then_isomap", n_components=2, return_embeddings=True)
+    # emb_cam_dict = reduce_layers(vectors_by_layer2, method="pca_then_isomap", n_components=2, return_embeddings=True)
+    #
+    # for key in emb_hue_dict.keys():
+    #     if not key.endswith("_hue"):
+    #         continue
+    #     base = key[:-4]  # entferne suffix "_hue"
+    #     cam_key = f"{base}_cam"
+    #     if cam_key not in emb_cam_dict:
+    #         print(f"[warn] missing {cam_key} in emb_cam_dict")
+    #         continue
+    #
+    #     emb_hue = emb_hue_dict[key]  # ndarray [N,2]
+    #     emb_cam = emb_cam_dict[cam_key]  # ndarray [N,2]
+    #
+    #     # # (Optional) center before topology to stabilize angle-based rings
+    #     # emb_hue = emb_hue - emb_hue.mean(axis=0, keepdims=True)
+    #     # emb_cam = emb_cam - emb_cam.mean(axis=0, keepdims=True)
+    #
+    #     # ---- 3) Persistent homology on 2D embeddings ----
+    #     res_hue = ripser(emb_hue, maxdim=1)
+    #     res_cam = ripser(emb_cam, maxdim=1)
+    #
+    #     # Plot Hue diagram
+    #     plot = plt.figure()
+    #     plot_diagrams(res_hue["dgms"])
+    #     plt.title(f"Persistence Diagram Hue - {base}")
+    #     plt.tight_layout()
+    #     plt.savefig(f'persistence_diagram_hue_{model_name}_{base}.png', dpi=300)
+    #     plot.show()
+    #
+    #     plot = plt.figure()
+    #     plot_diagrams(res_cam["dgms"])
+    #     plt.title(f"Persistence Diagram Camera - {base}")
+    #     plt.tight_layout()
+    #     plt.savefig(f'persistence_diagram_camera_{model_name}_{base}.png', dpi=300)
+    #     plot.show()
 
     # camera x hue
     import matplotlib
@@ -952,49 +957,284 @@ if __name__ == "__main__":
     # plt.show()
 
     # persistence diagram camera x hue (3D)
-    from ripser import ripser
-    from persim import plot_diagrams, bottleneck
+    # from ripser import ripser
+    # from persim import plot_diagrams, bottleneck
+    # #
+    # # number of points to subsample for ripser
+    # SAMPLE_SIZE = 1000
+    # model_name = "cipersimclr"
+    # layers = ["relu", "layer1.0.relu","layer2.0.relu", "layer3.0.relu", "layer4.0.relu","layer4.1.relu", "layer4.2.relu"]
+    # images_folder = r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\images"
+    # # images_folder = r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\images"
+    # vectors_by_layer_ordered_by_camera, paths, camera_angles = layer_vectors_from_folder(
+    #     images_folder,
+    #     param_index=0,
+    #     render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\params.csv",
+    #     # render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
+    #     layer_names=layers,
+    #     limit=None,
+    #     model_name=model_name
+    # )
+    # embedding_ord_camera = reduce_layers(
+    #     vectors_by_layer_ordered_by_camera,
+    #     method="pca_then_isomap",
+    #     n_components=3,
+    #     return_embeddings=True
+    # )
     #
-    # number of points to subsample for ripser
-    SAMPLE_SIZE = 1000
-    model_name = "cipersimclr"
-    layers = ["layer1.0.relu","layer2.0.relu", "layer3.0.relu", "layer4.0.relu","layer4.1.relu", "layer4.2.relu"]
-    images_folder = r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\images"
-    vectors_by_layer_ordered_by_camera, paths, _ = layer_vectors_from_folder(
-        images_folder,
-        param_index=0,
-        render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
-        layer_names=layers,
-        limit=None,
-        model_name=model_name
+    # # colorbar range based on min/max of camera_angles/hue_values
+    # # vmin = float(np.min(hue_values))
+    # # vmax = float(np.max(hue_values))
+    # vmin = float(np.min(camera_angles))
+    # vmax = float(np.max(camera_angles))
+    # for idx, (ln, Z) in enumerate(embedding_ord_camera.items()):
+    #     fig = plt.figure(figsize=(8, 6))
+    #     ax = fig.add_subplot(111, projection="3d")
+    #     sc = None
+    #     N = Z.shape[0]
+    #     sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=camera_angles, cmap="twilight", label=ln, vmin=vmin, vmax=vmax)
+    #     # sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=hue_values, cmap="hsv", label=ln, vmin=vmin,
+    #     #                 vmax=vmax)
+    #     ax.set_xlabel("Component 1")
+    #     ax.set_ylabel("Component 2")
+    #     ax.set_zlabel("Component 3")
+    #
+    #     if sc is not None:
+    #         ticks = [vmin, (vmin + vmax) / 2.0, vmax]
+    #         cbar = fig.colorbar(sc, ax=ax, shrink=0.5, ticks=ticks)
+    #         cbar.set_ticklabels([f"{t:.3f}" for t in ticks])
+    #     # plt.legend()
+    #     plt.tight_layout()
+    #     plt.savefig(f'camera_x_hue_3d_scatter_camera_microphone_{model_name}_{str(layers[idx])}.png', dpi=300)
+    #     plt.show()
+    # for key in embedding_ord_camera.keys():
+    #     base = key
+    #     emb_cam = embedding_ord_camera[base]  # ndarray [N,3]
+    #     N = emb_cam.shape[0]
+    #
+    #     # -uniform subsample to SAMPLE_SIZE points for ripser (if needed) -
+    #     if N > SAMPLE_SIZE:
+    #         idx = np.linspace(0, N - 1, num=SAMPLE_SIZE, dtype=int)
+    #         emb_sample = emb_cam[idx]
+    #         print(f"[info] {base}: subsampled {N} → {len(idx)} points for ripser")
+    #     else:
+    #         emb_sample = emb_cam
+    #         print(f"[info] {base}: using all {N} points for ripser")
+    #
+    #     # ---- 3) Persistent homology on 3D embeddings (subsampled) ----
+    #     res_cam = ripser(emb_sample, maxdim=2)
+    #
+    #     # Plot diagrams
+    #     plot2 = plt.figure()
+    #     plot_diagrams(res_cam["dgms"])
+    #     plt.title(f"{base} Camera topology (3D embedding, N={emb_sample.shape[0]})")
+    #     plt.tight_layout()
+    #     plot2.show()
+    #     plot2.savefig(f"persistence_diagram_camera_3d_microphone_{model_name}_{base}.png", dpi=300)
+
+### classification heat map
+
+import os, re
+from glob import glob
+import numpy as np
+import pandas as pd
+import torch
+from PIL import Image
+from typing import Tuple, Optional
+
+_IDX_RE = re.compile(r"(\d+)(?=\.(jpg|jpeg|png)$)", re.IGNORECASE)
+
+def _idx_from_name(p: str) -> int:
+    m = _IDX_RE.search(os.path.basename(p))
+    return int(m.group(1)) if m else 10**18
+
+@torch.no_grad()
+def outputs_from_folder(
+    folder: str,
+    render_param: str,
+    param_indices: Tuple[int, int] = (0, 1),   # (camera_idx, hue_idx)
+    patterns: Tuple[str, ...] = ("*.jpg", "*.jpeg", "*.png"),
+    limit: Optional[int] = None,
+    device: Optional[str] = None,
+    model_name: str = "resnet50",
+):
+    model, preprocess, device = get_model_and_preprocess(device, model_name)
+
+    # images sorted by index
+    paths = []
+    for p in patterns:
+        paths.extend(glob(os.path.join(folder, p)))
+    paths.sort(key=_idx_from_name)
+
+    # csv in row order
+    df = pd.read_csv(render_param)
+    N = min(len(paths), len(df))
+    if limit is not None:
+        N = min(N, int(limit))
+    paths = paths[:N]
+    df = df.iloc[:N].reset_index(drop=True)
+
+    p0 = df.iloc[:, param_indices[0]].to_numpy(dtype=float)
+    p1 = df.iloc[:, param_indices[1]].to_numpy(dtype=float)
+
+    preds = np.empty(N, dtype=int)
+    preds_unchanged = []
+    for i, p in enumerate(paths):
+        img = Image.open(p).convert("RGB")
+        x = preprocess(img).unsqueeze(0).to(device)
+        y = model(x)
+        # print(y.shape)
+        if isinstance(y, (tuple, list)): y = y[0]
+        preds[i] = int(torch.argmax(y, dim=1).item())
+        preds_unchanged.append(y.detach())
+        if (i + 1) % 500 == 0 or (i + 1) == N:
+            print(f"[info] processed {i + 1}/{N} images")
+
+    return preds, p0, p1, paths, preds_unchanged
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def heatmap_from_params(
+    preds: np.ndarray,
+    p0: np.ndarray,
+    p1: np.ndarray,
+    target_class_id: int,
+    bins0: int = 180,     # z.B. camera steps
+    bins1: int = 180,     # z.B. hue steps
+    p0_range=None,        # (min,max) optional
+    p1_range=None,
+):
+    preds = np.asarray(preds)
+    p0 = np.asarray(p0, dtype=float)
+    p1 = np.asarray(p1, dtype=float)
+
+    acc = (preds == int(target_class_id)).astype(np.float32)
+
+    if p0_range is None: p0_range = (float(p0.min()), float(p0.max()))
+    if p1_range is None: p1_range = (float(p1.min()), float(p1.max()))
+
+    # bin edges
+    e0 = np.linspace(p0_range[0], p0_range[1], bins0 + 1)
+    e1 = np.linspace(p1_range[0], p1_range[1], bins1 + 1)
+
+    # accumulate sum + count per cell
+    H_sum = np.zeros((bins0, bins1), dtype=np.float32)
+    H_cnt = np.zeros((bins0, bins1), dtype=np.int32)
+
+    i0 = np.clip(np.digitize(p0, e0) - 1, 0, bins0 - 1)
+    i1 = np.clip(np.digitize(p1, e1) - 1, 0, bins1 - 1)
+
+    for a, r, c in zip(acc, i0, i1):
+        H_sum[r, c] += a
+        H_cnt[r, c] += 1
+
+    H_acc = np.divide(H_sum, np.maximum(H_cnt, 1), dtype=np.float32)  # 0..1
+    return H_acc, e0, e1
+
+def plot_heatmap(H_acc, e0, e1, title="Camera × Hue", xlabel="p1", ylabel="p0", out_path=None):
+    plt.figure(figsize=(6,5))
+    # imshow expects [rows, cols] -> rows correspond to p0 bins, cols to p1 bins
+    extent = [e1[0], e1[-1], e0[0], e0[-1]]  # x=p1, y=p0
+    im = plt.imshow(H_acc, origin="lower", aspect="auto", extent=extent, vmin=0, vmax=1)
+    plt.colorbar(im, label="Accuracy")
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.tight_layout()
+    if out_path:
+        plt.savefig(out_path, dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
+def santi_plot(target_class, preds, camera, hue, outpath):
+    from scipy.special import softmax
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    num_label_camera = len(np.unique(camera))
+    num_label_hue = len(np.unique(hue))
+    preds = np.array([p.detach().cpu().numpy() for p in preds])
+    accuracy = softmax(preds, axis=1) # error!!!
+    accuracy = accuracy.squeeze()
+    # print how many values are not 1
+    print(f"{np.sum(accuracy != 1)=}")
+    print(f"{np.unique(np.argmax(accuracy, axis=1))=}")
+    print(accuracy.shape)
+    accuracy_umbrella = accuracy[:, target_class]
+    print(accuracy_umbrella.shape)
+    print(accuracy_umbrella)
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    im = ax.imshow(accuracy_umbrella.reshape(num_label_camera, num_label_hue), vmin=0, vmax=1, cmap='plasma')
+    ax.invert_yaxis()
+    ax.set_yticks([0, 49, 99], [0, r'$\pi$', r'2$\pi$'])
+    ax.set_xticks([0, 49, 99], [0, r'$\pi$', r'2$\pi$'])
+    ax.set_xlabel(r'$\theta_{hue}$', fontsize=12)
+    ax.set_ylabel(r'$\theta_{camera}$', fontsize=12)
+
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = fig.colorbar(im, cax=cax)
+    cbar.ax.set_ylabel('Accuracy', rotation=270, labelpad=15)
+    fig.savefig(outpath)
+    plt.show()
+    idx_min = np.argmin(accuracy_umbrella)
+    camera_min = camera[idx_min]
+    hue_min = hue[idx_min]
+
+    print(camera_min, hue_min)
+
+
+
+# classification heatmap run
+target_classes = [879, 650]
+folder_paths = [r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\images"]
+render_params= [r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\params.csv"]
+bin_sizes = [48, 24]
+for i in range(2):
+    target_class = target_classes[i]
+    folder = folder_paths[i]
+    render_param = render_params[i]
+    bin_size = bin_sizes[i]
+    model = "simclr_santi"
+    preds, cam, hue, paths, preds_unchanged = outputs_from_folder(
+        folder=folder,
+        render_param=render_param,
+        param_indices=(0, 1),
+        device="cuda",
+        model_name=model,
     )
-    embedding_ord_camera = reduce_layers(
-        vectors_by_layer_ordered_by_camera,
-        method="pca_then_isomap",
-        n_components=3,
-        return_embeddings=True
-    )
-    for key in embedding_ord_camera.keys():
-        base = key
-        emb_cam = embedding_ord_camera[base]  # ndarray [N,3]
-        N = emb_cam.shape[0]
 
-        # -uniform subsample to SAMPLE_SIZE points for ripser (if needed) -
-        if N > SAMPLE_SIZE:
-            idx = np.linspace(0, N - 1, num=SAMPLE_SIZE, dtype=int)
-            emb_sample = emb_cam[idx]
-            print(f"[info] {base}: subsampled {N} → {len(idx)} points for ripser")
-        else:
-            emb_sample = emb_cam
-            print(f"[info] {base}: using all {N} points for ripser")
+    # print distinct predicted classes
+    # print(preds)
+    unique, counts = np.unique(preds, return_counts=True)
+    class_counts = dict(zip(unique, counts))
+    print("Predicted class counts:")
+    imgnet_classes = open(r"C:\Users\silas\PycharmProjects\SimClr_MT\imagenet_classes.txt", "r").read().splitlines()
+    for cls_id, cnt in sorted(class_counts.items()):
+        cls_idx = int(cls_id)
+        cls_name = imgnet_classes[cls_idx] if 0 <= cls_idx < len(imgnet_classes) else "<unknown>"
+        print(f"  Index {cls_idx}: {cls_name}  - {cnt} images")
 
-        # ---- 3) Persistent homology on 3D embeddings (subsampled) ----
-        res_cam = ripser(emb_sample, maxdim=2)
+    # H, e_cam, e_hue = heatmap_from_params(
+    #     preds=preds,
+    #     p0=cam,
+    #     p1=hue,
+    #     target_class_id=target_class,
+    #     bins0 = bin_size,
+    #     bins1 = bin_size
+    # )
+    #
+    # plot_heatmap(
+    #     H, e_cam, e_hue,
+    #     title="Camera × Hue",
+    #     xlabel=r"$\theta_{hue}$",
+    #     ylabel=r"$\theta_{camera}$",
+    #     out_path=f"camera_x_hue_accuracy_{model}_{target_class}_{bin_size}.png",
+    # )
 
-        # Plot diagrams
-        plot2 = plt.figure()
-        plot_diagrams(res_cam["dgms"])
-        plt.title(f"{base} Camera topology (3D embedding, N={emb_sample.shape[0]})")
-        plt.tight_layout()
-        plot2.show()
-        plot2.savefig(f"persistence_diagram_camera_3d_{model_name}_{base}.png", dpi=300)
+    print(preds.shape)
+
+    santi_plot(target_class, preds_unchanged, cam, hue, outpath=f"camera_x_hue_accuracy_{model}_{target_class}_santi.png")
+
