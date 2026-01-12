@@ -221,7 +221,44 @@ def load_simclr():
 
     model = resnet50x1()
     weights = torch.load(path_weigths, map_location='cpu')
-    model.load_state_dict(weights['state_dict'])
+
+    # Unterstütze Dateien, die ein dict mit 'state_dict' enthalten
+    if isinstance(weights, dict) and 'state_dict' in weights:
+        state = weights['state_dict']
+    else:
+        state = weights
+
+    # Entferne eventuell vorhandenes 'module.'-Präfix (z.B. von DataParallel)
+    new_state = {}
+    for k, v in state.items():
+        new_key = k
+        if k.startswith('module.'):
+            new_key = k[len('module.'):]
+        new_state[new_key] = v
+
+    result = model.load_state_dict(new_state, strict=False)
+
+    # Prüfe, ob Gewichte sinnvoll geladen wurden
+    missing = getattr(result, 'missing_keys', None)
+    unexpected = getattr(result, 'unexpected_keys', None)
+
+    model_keys = set(model.state_dict().keys())
+    loaded_keys = set(new_state.keys())
+    matched = model_keys & loaded_keys
+    # print(matched)
+
+    if not matched:
+        raise RuntimeError(f"No matching keys between model and weights at `path_weigths`: {path_weigths}")
+
+    if missing:
+        raise RuntimeError(f"Missing keys when loading weights: {missing}")
+
+    if unexpected:
+        import warnings
+        warnings.warn(f"Unexpected keys in weights (these will be ignored): {unexpected}")
+
+    # Drucke Erfolgsmeldung bei erfolgreichem Laden
+    print("success")
 
     preprocess = transforms.Compose([
             transforms.Resize(256),
