@@ -1,5 +1,4 @@
-from simclr import load_simclr
+from models import Model, get_model
 
-__all__ = [load_simclr]
-
+__all__ = [Model, get_model]
 

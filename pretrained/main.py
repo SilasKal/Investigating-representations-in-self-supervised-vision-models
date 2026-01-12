@@ -1186,22 +1186,48 @@ def santi_plot(target_class, preds, camera, hue, outpath):
 
 
 # classification heatmap run
-target_classes = [879, 650]
-folder_paths = [r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\images",
-                r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\images"]
-render_params= [r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
-                r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\params.csv"]
-bin_sizes = [48, 24]
-for i in range(2):
+# target_classes = [879, 650]
+# folder_paths = [r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\images",
+#                 r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\images"]
+# render_params= [r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
+#                 r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\params.csv"]
+# bin_sizes = [48, 24]
+target_classes = [1, 293, 404, 541, 579, 651, 671, 732, 949, 954]
+folder_paths = [r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\001_goldfish\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\293_cheetah\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\404_airliner\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\541_drum\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\579_grand-piano\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\651_microwave\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\671_mountain-bike\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\732_polaroid\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\949_strawberry\images",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\954_banana\images"]
+render_params= [r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\001_goldfish\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\293_cheetah\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\404_airliner\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\541_drum\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\579_grand-piano\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\651_microwave\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\671_mountain-bike\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\732_polaroid\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\949_strawberry\parameters.csv",
+                r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\954_banana\parameters.csv"]
+bin_sizes = [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
+
+
+
+for i in range(len(target_classes)):
     target_class = target_classes[i]
     folder = folder_paths[i]
     render_param = render_params[i]
     bin_size = bin_sizes[i]
     model = "simclr_santi"
+    print(f"Processing target class {target_class} in folder {folder}...")
     preds, cam, hue, paths, preds_unchanged = outputs_from_folder(
         folder=folder,
         render_param=render_param,
-        param_indices=(0, 1),
+        param_indices=(1, 2),
         device="cuda",
         model_name=model,
     )
@@ -1209,32 +1235,35 @@ for i in range(2):
     # print distinct predicted classes
     # print(preds)
     unique, counts = np.unique(preds, return_counts=True)
-    class_counts = dict(zip(unique, counts))
-    print("Predicted class counts:")
+    pairs = list(zip(unique.tolist(), counts.tolist()))
+    top_pairs = sorted(pairs, key=lambda x: x[1], reverse=True)[:10]
+    print("Predicted class counts (top 10):")
     imgnet_classes = open(r"C:\Users\silas\PycharmProjects\SimClr_MT\imagenet_classes.txt", "r").read().splitlines()
-    for cls_id, cnt in sorted(class_counts.items()):
+    for cls_id, cnt in top_pairs:
         cls_idx = int(cls_id)
         cls_name = imgnet_classes[cls_idx] if 0 <= cls_idx < len(imgnet_classes) else "<unknown>"
-        print(f"  Index {cls_idx}: {cls_name}  - {cnt} images")
+        print(f"Index: {cls_name}  - {cnt} images")
 
-    # H, e_cam, e_hue = heatmap_from_params(
-    #     preds=preds,
-    #     p0=cam,
-    #     p1=hue,
-    #     target_class_id=target_class,
-    #     bins0 = bin_size,
-    #     bins1 = bin_size
-    # )
-    #
-    # plot_heatmap(
-    #     H, e_cam, e_hue,
-    #     title="Camera × Hue",
-    #     xlabel=r"$\theta_{hue}$",
-    #     ylabel=r"$\theta_{camera}$",
-    #     out_path=f"camera_x_hue_accuracy_{model}_{target_class}_{bin_size}.png",
-    # )
+    H, e_cam, e_hue = heatmap_from_params(
+        preds=preds,
+        p0=cam,
+        p1=hue,
+        target_class_id=target_class,
+        bins0 = bin_size,
+        bins1 = bin_size
+    )
+
+    plot_heatmap(
+        H, e_cam, e_hue,
+        # title="Camera × Hue",
+        title=f"camera.azimuth x camera.distance - class {imgnet_classes[target_class]})",
+        xlabel=r"$\theta_{camera}$",
+        ylabel=r"$d_{camera}$",
+        # xlabel=r"$\theta_{hue}$",
+        # ylabel=r"$\theta_{camera}$",
+        out_path=f"camera_x_hue_accuracy_{model}_{target_class}_{bin_size}.png",
+    )
 
     print(preds.shape)
 
-    santi_plot(target_class, preds_unchanged, cam, hue, outpath=f"camera_x_hue_accuracy_{model}_{target_class}_santi.png")
-
+    # santi_plot(target_class, preds_unchanged, cam, hue, outpath=f"camera_x_hue_accuracy_{model}_{target_class}_santi.png")
