@@ -56,6 +56,15 @@ def get_model_and_preprocess(device: Optional[str] = None, model_name: str = "si
         transforms.ToTensor(),
         ])
         print(model)
+    else:
+        from load_aubret_models import custom_mvimgnet
+        print("Custom MVImgNet Model")
+        model = custom_mvimgnet(model_name)
+        preprocess = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+        ])
     model.eval()
     if device is None:
         # device = 'cpu'
@@ -892,21 +901,24 @@ if __name__ == "__main__":
     # layers = ["layer3.0.relu"]
     # layers = ["layer4.0.relu"]
     # layers = ["layer4.1.relu"]
-    # # layers = ["layer4.2.relu"]
+    # layers = ["layer4.2.relu"]
     # model_name = "aasimclr"
-    # # layers = [ "layer1.0.relu", "layer1.1.relu", "layer1.2.relu", "layer2.0.relu", "layer2.1.relu", "layer2.2.relu",
-    # #                     "layer2.3.relu", "layer3.0.relu", "layer3.1.relu", "layer3.2.relu", "layer3.3.relu", "layer3.4.relu",
-    # #                     "layer3.5.relu", "layer4.0.relu", "layer4.1.relu", "layer4.2.relu"]
+    model_name = r"C:\Users\silas\PycharmProjects\SimClr_MT\models_finetuning_MAPS_10k\epoch_49.pt"
+    layers = ["relu", "layer1.0.relu", "layer2.0.relu","layer3.0.relu", "layer4.0.relu", "layer4.1.relu", "layer4.2.relu"]
     # images_folder = r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\images"
-    # vectors_by_layer_ordered_by_camera, paths, camera_angles = layer_vectors_from_folder(
-    #     images_folder,
-    #     param_index=0,
-    #     # render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\camera\render_params.csv",
-    #     render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
-    #     layer_names=layers,
-    #     limit=20000,
-    #     model_name=model_name
-    # )
+    images_folder = r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\001_goldfish\images"
+    param_index = 4
+    render_param = r"C:\Users\silas\PycharmProjects\SimClr_MT\dataset_10000\001_goldfish\parameters.csv"
+    vectors_by_layer_ordered_by_camera, paths, camera_angles = layer_vectors_from_folder(
+        images_folder,
+        param_index=param_index,
+        # render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\umbrella\camera\render_params.csv",
+        # render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
+        render_param=render_param,
+        layer_names=layers,
+        limit=20000,
+        model_name=model_name
+    )
     # # matplotlib.use('qtagg')
     # # vectors_by_layer_ordered_by_hue, paths2, hue_values = layer_vectors_from_folder(
     # #     images_folder,
@@ -916,12 +928,12 @@ if __name__ == "__main__":
     # #     limit=20000,
     # #     model_name=model_name
     # # )
-    # embedding_ord_camera = reduce_layers(
-    #     vectors_by_layer_ordered_by_camera,
-    #     method="pca_then_isomap",
-    #     n_components=3,
-    #     return_embeddings=True
-    # )
+    embedding_ord_camera = reduce_layers(
+        vectors_by_layer_ordered_by_camera,
+        method="pca_then_isomap",
+        n_components=3,
+        return_embeddings=True
+    )
     #
     # # embedding_ord_hue = reduce_layers(
     # #     vectors_by_layer_ordered_by_hue,
@@ -929,108 +941,113 @@ if __name__ == "__main__":
     # #     n_components=3,
     # #     return_embeddings=True,
     # # )
-    # fig = plt.figure(figsize=(8, 6))
-    # ax = fig.add_subplot(111, projection="3d")
-    # sc = None
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection="3d")
+    sc = None
     #
-    # # colorbar range based on min/max of camera_angles/hue_values
+    # colorbar range based on min/max of camera_angles/hue_values
     # # vmin = float(np.min(hue_values))
     # # vmax = float(np.max(hue_values))
-    # vmin = float(np.min(camera_angles))
-    # vmax = float(np.max(camera_angles))
-    # for idx, (ln, Z) in enumerate(embedding_ord_camera.items()):
-    #     N = Z.shape[0]
-    #     sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=camera_angles, cmap="twilight", label=ln, vmin=vmin, vmax=vmax)
-    #     # sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=hue_values, cmap="hsv", label=ln, vmin=vmin,
-    #     #                 vmax=vmax)
-    # ax.set_xlabel("Component 1")
-    # ax.set_ylabel("Component 2")
-    # ax.set_zlabel("Component 3")
-    #
-    # if sc is not None:
-    #     ticks = [vmin, (vmin + vmax) / 2.0, vmax]
-    #     cbar = fig.colorbar(sc, ax=ax, shrink=0.5, ticks=ticks)
-    #     cbar.set_ticklabels([f"{t:.3f}" for t in ticks])
-    # # plt.legend()
-    # plt.tight_layout()
+    vmin = float(np.min(camera_angles))
+    vmax = float(np.max(camera_angles))
+    for idx, (ln, Z) in enumerate(embedding_ord_camera.items()):
+        N = Z.shape[0]
+        sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=camera_angles, cmap="twilight", label=ln, vmin=vmin, vmax=vmax)
+        # sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=hue_values, cmap="hsv", label=ln, vmin=vmin,
+        #                 vmax=vmax)
+    ax.set_xlabel("Component 1")
+    ax.set_ylabel("Component 2")
+    ax.set_zlabel("Component 3")
+
+    if sc is not None:
+        ticks = [vmin, (vmin + vmax) / 2.0, vmax]
+        cbar = fig.colorbar(sc, ax=ax, shrink=0.5, ticks=ticks)
+        cbar.set_ticklabels([f"{t:.3f}" for t in ticks])
+    # plt.legend()
+    plt.tight_layout()
     # plt.savefig(f'camera_x_hue_3d_scatter_camera_{model_name}_{str(layers)}.png', dpi=300)
-    # plt.show()
+    plt.savefig(f'camera_x_hue_3d_scatter_goldfish_{param_index}_10k_finetuned_{str(layers[idx])}.png', dpi=300)
+    plt.show()
 
     # persistence diagram camera x hue (3D)
-    # from ripser import ripser
-    # from persim import plot_diagrams, bottleneck
-    # #
-    # # number of points to subsample for ripser
-    # SAMPLE_SIZE = 1000
+    from ripser import ripser
+    from persim import plot_diagrams, bottleneck
+    #
+    # number of points to subsample for ripser
+    SAMPLE_SIZE = 1000
     # model_name = "cipersimclr"
-    # layers = ["relu", "layer1.0.relu","layer2.0.relu", "layer3.0.relu", "layer4.0.relu","layer4.1.relu", "layer4.2.relu"]
+    layers = ["relu", "layer1.0.relu","layer2.0.relu", "layer3.0.relu", "layer4.0.relu","layer4.1.relu", "layer4.2.relu"]
     # images_folder = r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\images"
-    # # images_folder = r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\images"
-    # vectors_by_layer_ordered_by_camera, paths, camera_angles = layer_vectors_from_folder(
-    #     images_folder,
-    #     param_index=0,
-    #     render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\params.csv",
-    #     # render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
-    #     layer_names=layers,
-    #     limit=None,
-    #     model_name=model_name
-    # )
-    # embedding_ord_camera = reduce_layers(
-    #     vectors_by_layer_ordered_by_camera,
-    #     method="pca_then_isomap",
-    #     n_components=3,
-    #     return_embeddings=True
-    # )
-    #
-    # # colorbar range based on min/max of camera_angles/hue_values
-    # # vmin = float(np.min(hue_values))
-    # # vmax = float(np.max(hue_values))
-    # vmin = float(np.min(camera_angles))
-    # vmax = float(np.max(camera_angles))
-    # for idx, (ln, Z) in enumerate(embedding_ord_camera.items()):
-    #     fig = plt.figure(figsize=(8, 6))
-    #     ax = fig.add_subplot(111, projection="3d")
-    #     sc = None
-    #     N = Z.shape[0]
-    #     sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=camera_angles, cmap="twilight", label=ln, vmin=vmin, vmax=vmax)
-    #     # sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=hue_values, cmap="hsv", label=ln, vmin=vmin,
-    #     #                 vmax=vmax)
-    #     ax.set_xlabel("Component 1")
-    #     ax.set_ylabel("Component 2")
-    #     ax.set_zlabel("Component 3")
-    #
-    #     if sc is not None:
-    #         ticks = [vmin, (vmin + vmax) / 2.0, vmax]
-    #         cbar = fig.colorbar(sc, ax=ax, shrink=0.5, ticks=ticks)
-    #         cbar.set_ticklabels([f"{t:.3f}" for t in ticks])
-    #     # plt.legend()
-    #     plt.tight_layout()
-    #     plt.savefig(f'camera_x_hue_3d_scatter_camera_microphone_{model_name}_{str(layers[idx])}.png', dpi=300)
-    #     plt.show()
-    # for key in embedding_ord_camera.keys():
-    #     base = key
-    #     emb_cam = embedding_ord_camera[base]  # ndarray [N,3]
-    #     N = emb_cam.shape[0]
-    #
-    #     # -uniform subsample to SAMPLE_SIZE points for ripser (if needed) -
-    #     if N > SAMPLE_SIZE:
-    #         idx = np.linspace(0, N - 1, num=SAMPLE_SIZE, dtype=int)
-    #         emb_sample = emb_cam[idx]
-    #         print(f"[info] {base}: subsampled {N} → {len(idx)} points for ripser")
-    #     else:
-    #         emb_sample = emb_cam
-    #         print(f"[info] {base}: using all {N} points for ripser")
-    #
-    #     # ---- 3) Persistent homology on 3D embeddings (subsampled) ----
-    #     res_cam = ripser(emb_sample, maxdim=2)
-    #
-    #     # Plot diagrams
-    #     plot2 = plt.figure()
-    #     plot_diagrams(res_cam["dgms"])
-    #     plt.title(f"{base} Camera topology (3D embedding, N={emb_sample.shape[0]})")
-    #     plt.tight_layout()
-    #     plot2.show()
-    #     plot2.savefig(f"persistence_diagram_camera_3d_microphone_{model_name}_{base}.png", dpi=300)
+    # images_folder = r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\images"
+    vectors_by_layer_ordered_by_camera, paths, camera_angles = layer_vectors_from_folder(
+        images_folder,
+        param_index=param_index,
+        # render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\650_microphone\650_microphone\params.csv",
+        # render_param=r"C:\Users\silas\PycharmProjects\SimClr_MT\camera_hue\render_params.csv",
+        render_param=render_param,
+        layer_names=layers,
+        limit=None,
+        model_name=model_name
+    )
+    embedding_ord_camera = reduce_layers(
+        vectors_by_layer_ordered_by_camera,
+        method="pca_then_isomap",
+        n_components=3,
+        return_embeddings=True
+    )
+
+    # colorbar range based on min/max of camera_angles/hue_values
+    # vmin = float(np.min(hue_values))
+    # vmax = float(np.max(hue_values))
+    vmin = float(np.min(camera_angles))
+    vmax = float(np.max(camera_angles))
+    for idx, (ln, Z) in enumerate(embedding_ord_camera.items()):
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection="3d")
+        sc = None
+        N = Z.shape[0]
+        sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=camera_angles, cmap="twilight", label=ln, vmin=vmin, vmax=vmax)
+        # sc = ax.scatter(Z[:, 0], Z[:, 1], Z[:, 2], s=10, c=hue_values, cmap="hsv", label=ln, vmin=vmin,
+        #                 vmax=vmax)
+        ax.set_xlabel("Component 1")
+        ax.set_ylabel("Component 2")
+        ax.set_zlabel("Component 3")
+
+        if sc is not None:
+            ticks = [vmin, (vmin + vmax) / 2.0, vmax]
+            cbar = fig.colorbar(sc, ax=ax, shrink=0.5, ticks=ticks)
+            cbar.set_ticklabels([f"{t:.3f}" for t in ticks])
+        # plt.legend()
+        plt.tight_layout()
+        # plt.savefig(f'camera_x_hue_3d_scatter_camera_microphone_{model_name}_{str(layers[idx])}.png', dpi=300)
+        plt.savefig(f'camera_x_hue_3d_scatter_camera_goldfish_{param_index}_10k_finetuned_{str(layers[idx])}.png', dpi=300)
+        plt.show()
+    for key in embedding_ord_camera.keys():
+        base = key
+        emb_cam = embedding_ord_camera[base]  # ndarray [N,3]
+        N = emb_cam.shape[0]
+
+        # -uniform subsample to SAMPLE_SIZE points for ripser (if needed) -
+        if N > SAMPLE_SIZE:
+            idx = np.linspace(0, N - 1, num=SAMPLE_SIZE, dtype=int)
+            emb_sample = emb_cam[idx]
+            print(f"[info] {base}: subsampled {N} → {len(idx)} points for ripser")
+        else:
+            emb_sample = emb_cam
+            print(f"[info] {base}: using all {N} points for ripser")
+
+        # ---- 3) Persistent homology on 3D embeddings (subsampled) ----
+        res_cam = ripser(emb_sample, maxdim=2)
+
+        # Plot diagrams
+        plot2 = plt.figure()
+        plot_diagrams(res_cam["dgms"])
+        plt.title(f"{base} Camera topology (3D embedding, N={emb_sample.shape[0]})")
+        plt.tight_layout()
+        plot2.show()
+        # plot2.savefig(f"persistence_diagram_camera_3d_microphone_{model_name}_{base}.png", dpi=300)
+        plot2.savefig(f"persistence_diagram_camera_3d_{param_index}_goldfish_10k_finetuned_{base}.png", dpi=300)
+
 
 ### classification heat map
 
@@ -1217,53 +1234,53 @@ bin_sizes = [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
 
 
 
-for i in range(len(target_classes)):
-    target_class = target_classes[i]
-    folder = folder_paths[i]
-    render_param = render_params[i]
-    bin_size = bin_sizes[i]
-    model = "simclr_santi"
-    print(f"Processing target class {target_class} in folder {folder}...")
-    preds, cam, hue, paths, preds_unchanged = outputs_from_folder(
-        folder=folder,
-        render_param=render_param,
-        param_indices=(1, 2),
-        device="cuda",
-        model_name=model,
-    )
-
-    # print distinct predicted classes
-    # print(preds)
-    unique, counts = np.unique(preds, return_counts=True)
-    pairs = list(zip(unique.tolist(), counts.tolist()))
-    top_pairs = sorted(pairs, key=lambda x: x[1], reverse=True)[:10]
-    print("Predicted class counts (top 10):")
-    imgnet_classes = open(r"C:\Users\silas\PycharmProjects\SimClr_MT\imagenet_classes.txt", "r").read().splitlines()
-    for cls_id, cnt in top_pairs:
-        cls_idx = int(cls_id)
-        cls_name = imgnet_classes[cls_idx] if 0 <= cls_idx < len(imgnet_classes) else "<unknown>"
-        print(f"Index: {cls_name}  - {cnt} images")
-
-    H, e_cam, e_hue = heatmap_from_params(
-        preds=preds,
-        p0=cam,
-        p1=hue,
-        target_class_id=target_class,
-        bins0 = bin_size,
-        bins1 = bin_size
-    )
-
-    plot_heatmap(
-        H, e_cam, e_hue,
-        # title="Camera × Hue",
-        title=f"camera.azimuth x camera.distance - class {imgnet_classes[target_class]})",
-        xlabel=r"$\theta_{camera}$",
-        ylabel=r"$d_{camera}$",
-        # xlabel=r"$\theta_{hue}$",
-        # ylabel=r"$\theta_{camera}$",
-        out_path=f"camera_x_hue_accuracy_{model}_{target_class}_{bin_size}.png",
-    )
-
-    print(preds.shape)
+# for i in range(len(target_classes)):
+#     target_class = target_classes[i]
+#     folder = folder_paths[i]
+#     render_param = render_params[i]
+#     bin_size = bin_sizes[i]
+#     model = "simclr_santi"
+#     print(f"Processing target class {target_class} in folder {folder}...")
+#     preds, cam, hue, paths, preds_unchanged = outputs_from_folder(
+#         folder=folder,
+#         render_param=render_param,
+#         param_indices=(1, 2),
+#         device="cuda",
+#         model_name=model,
+#     )
+#
+#     # print distinct predicted classes
+#     # print(preds)
+#     unique, counts = np.unique(preds, return_counts=True)
+#     pairs = list(zip(unique.tolist(), counts.tolist()))
+#     top_pairs = sorted(pairs, key=lambda x: x[1], reverse=True)[:10]
+#     print("Predicted class counts (top 10):")
+#     imgnet_classes = open(r"C:\Users\silas\PycharmProjects\SimClr_MT\imagenet_classes.txt", "r").read().splitlines()
+#     for cls_id, cnt in top_pairs:
+#         cls_idx = int(cls_id)
+#         cls_name = imgnet_classes[cls_idx] if 0 <= cls_idx < len(imgnet_classes) else "<unknown>"
+#         print(f"Index: {cls_name}  - {cnt} images")
+#
+#     H, e_cam, e_hue = heatmap_from_params(
+#         preds=preds,
+#         p0=cam,
+#         p1=hue,
+#         target_class_id=target_class,
+#         bins0 = bin_size,
+#         bins1 = bin_size
+#     )
+#
+#     plot_heatmap(
+#         H, e_cam, e_hue,
+#         # title="Camera × Hue",
+#         title=f"camera.azimuth x camera.distance - class {imgnet_classes[target_class]})",
+#         xlabel=r"$\theta_{camera}$",
+#         ylabel=r"$d_{camera}$",
+#         # xlabel=r"$\theta_{hue}$",
+#         # ylabel=r"$\theta_{camera}$",
+#         out_path=f"camera_x_hue_accuracy_{model}_{target_class}_{bin_size}.png",
+#     )
+#
+#     print(preds.shape)
 
     # santi_plot(target_class, preds_unchanged, cam, hue, outpath=f"camera_x_hue_accuracy_{model}_{target_class}_santi.png")
