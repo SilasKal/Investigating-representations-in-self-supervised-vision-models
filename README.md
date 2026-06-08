@@ -133,4 +133,4 @@ For reproducibility, the recommended order is:
 3. Run the performance evaluation scripts.
 4. Run the representation analysis and visualization scripts.
 
-Large generated files, intermediate outputs, model checkpoints, or datasets are not be included in this repository but can be provided if requested.
+Large generated files, intermediate outputs, model checkpoints, or datasets are not included in this repository but can be provided if requested.
