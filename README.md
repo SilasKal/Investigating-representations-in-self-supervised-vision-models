@@ -51,6 +51,7 @@ Use this folder if you are looking for files related to:
 - Training configurations
 - Model checkpoints or saved training outputs
 - Training logs and metrics
+- ImageNet transfer experiments
 
 This folder is the starting point for reproducing the trained models used in the later evaluation and analysis steps.
 
@@ -67,7 +68,6 @@ Use this folder if you are looking for files related to:
 - Train/test comparison plots
 - Accuracy across object instances
 - Accuracy across transformations
-- ImageNet transfer experiments
 - Performance comparisons between supervised, self-supervised, and action-based models
 - Action parameter ablation analysis
 
