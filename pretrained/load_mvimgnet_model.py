@@ -273,11 +273,12 @@ def resnet50(**kwargs: Any) -> ResNet:
 
 import os
 # language: python
-def load_mv_model(path_weigths=None, device='cpu'):
+def load_mv_model(path_weigths=None, device='cpu', use_sup_lin_projector=False):
     path_dir = os.path.dirname(os.path.abspath(__file__))
     assert os.path.exists(path_weigths), f"Weights path not found: {path_weigths}"
 
-    model = resnet50()
+    # model = resnet50()
+    model = resnet18()
 
     # safer torch.load: use weights_only when available (PyTorch recent) else fallback
     try:
@@ -331,7 +332,126 @@ def load_mv_model(path_weigths=None, device='cpu'):
     if used_prefix:
         print(f"Removed prefix `{used_prefix}` from checkpoint keys (overlap {overlap} with model keys).")
 
-    # final load (non-strict to allow differing keys), report mismatches in German
+    # ── Handle SSL training heads ─────────────────────────────────────────
+    # sup_lin_projector0 is a supervised linear probe (backbone → num_classes).
+    # When use_sup_lin_projector=True we promote it to model.fc so that
+    # forward() returns class logits.  All other heads are always discarded.
+    _OTHER_SSL_PREFIXES = (
+        "projector.",
+        "action_projector.",
+        "action_head.",
+        "predictor.",
+        "momentum_encoder.",
+    )
+
+    # Find sup_lin_projector keys (e.g. sup_lin_projector0.weight / .bias)
+    import re as _re
+    sup_keys = [k for k in state_dict if _re.match(r"^sup_lin_projector\d*\.", k)]
+
+    if use_sup_lin_projector and sup_keys:
+        # Determine the layer index suffix (e.g. "0" in "sup_lin_projector0")
+        # Use the first one found (there is typically only one)
+        prefix_match = _re.match(r"^(sup_lin_projector\d*)\.", sup_keys[0])
+        proj_prefix = prefix_match.group(1)          # e.g. "sup_lin_projector0"
+        w_key = f"{proj_prefix}.weight"
+        b_key = f"{proj_prefix}.bias"
+
+        w = state_dict[w_key]                        # shape (num_classes, in_features)
+        out_feat = w.shape[0]
+        in_feat  = w.shape[1]
+        has_bias = b_key in state_dict
+
+        # Remap sup_lin_projector0.* → fc.* so load_state_dict picks them up
+        for k in list(state_dict.keys()):
+            if k.startswith(proj_prefix + "."):
+                new_k = "fc" + k[len(proj_prefix):]  # e.g. "fc.weight"
+                state_dict[new_k] = state_dict.pop(k)
+
+        model.fc = nn.Linear(in_feat, out_feat, bias=has_bias)
+        print(f"Promoted {proj_prefix} → fc  (in={in_feat}, out={out_feat}, bias={has_bias}).")
+
+        # Patch forward to include fc
+        import types
+        def _new_forward_impl(self, x):
+            x = self.conv1(x); x = self.bn1(x); x = self.relu(x); x = self.maxpool(x)
+            x = self.layer1(x); x = self.layer2(x); x = self.layer3(x); x = self.layer4(x)
+            x = self.avgpool(x); x = torch.flatten(x, 1)
+            x = self.fc(x)
+            return x
+        model._forward_impl = types.MethodType(_new_forward_impl, model)
+
+    else:
+        # Discard sup_lin_projector keys (and all other SSL heads)
+        if sup_keys:
+            print(f"Ignoring {len(sup_keys)} sup_lin_projector key(s) "
+                  f"(pass use_sup_lin_projector=True to load them as fc).")
+
+    # Always discard the remaining SSL-only heads
+    all_ssl_discard = _OTHER_SSL_PREFIXES + (() if use_sup_lin_projector else ("sup_lin_projector",))
+    discarded = [k for k in state_dict if k.startswith(all_ssl_discard)]
+    if discarded:
+        print(f"Ignoring {len(discarded)} SSL training-head keys "
+              f"(projector / action_projector / action_head / …) — not needed for inference.")
+        state_dict = {k: v for k, v in state_dict.items() if not k.startswith(all_ssl_discard)}
+
+    # ── Dynamically attach fc if the checkpoint contains one ──────────────
+    # The checkpoint may carry fc.weight / fc.bias (or a projection head with
+    # multiple layers). We reconstruct whatever Linear layers are present so
+    # that the weights load strictly without unexpected keys.
+    fc_keys = sorted([k for k in state_dict if k.startswith("fc.")])
+    if fc_keys:
+        # Collect unique layer indices (handles both "fc.weight" flat and
+        # "fc.0.weight", "fc.2.weight" sequential-style heads)
+        import re as _re
+        indexed = [k for k in fc_keys if _re.match(r"^fc\.\d+\.", k)]
+        if indexed:
+            # Sequential projection head: fc.0.weight, fc.0.bias, fc.2.weight …
+            layer_indices = sorted({int(_re.match(r"^fc\.(\d+)\.", k).group(1))
+                                    for k in indexed})
+            layers_list = []
+            in_feat = model.num_output
+            for idx in layer_indices:
+                w_key = f"fc.{idx}.weight"
+                b_key = f"fc.{idx}.bias"
+                if w_key in state_dict:
+                    out_feat = state_dict[w_key].shape[0]
+                    has_bias = b_key in state_dict
+                    layers_list.append(nn.Linear(in_feat, out_feat, bias=has_bias))
+                    in_feat = out_feat
+                else:
+                    # e.g. a ReLU or BN – use Identity as placeholder so indices match
+                    layers_list.append(nn.Identity())
+            model.fc = nn.Sequential(*layers_list)
+            print(f"Attached sequential fc head with {len(layers_list)} sub-layers.")
+        else:
+            # Simple single Linear: fc.weight / fc.bias
+            w = state_dict["fc.weight"]          # shape (num_classes, in_features)
+            out_feat = w.shape[0]
+            in_feat  = w.shape[1]
+            has_bias = "fc.bias" in state_dict
+            model.fc = nn.Linear(in_feat, out_feat, bias=has_bias)
+            print(f"Attached fc layer: in={in_feat}, out={out_feat}, bias={has_bias}.")
+
+        # Re-register the new fc in forward so it's actually used
+        # (the custom ResNet._forward_impl does NOT call self.fc, so we patch it)
+        _original_forward_impl = model.__class__._forward_impl
+        def _new_forward_impl(self, x):
+            x = self.conv1(x)
+            x = self.bn1(x)
+            x = self.relu(x)
+            x = self.maxpool(x)
+            x = self.layer1(x)
+            x = self.layer2(x)
+            x = self.layer3(x)
+            x = self.layer4(x)
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+            x = self.fc(x)
+            return x
+        import types
+        model._forward_impl = types.MethodType(_new_forward_impl, model)
+
+    # ── Load weights ───────────────────────────────────────────────────────
     load_result = model.load_state_dict(state_dict, strict=False)
     missing = load_result.missing_keys
     unexpected = load_result.unexpected_keys
