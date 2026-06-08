@@ -69,6 +69,7 @@ Use this folder if you are looking for files related to:
 - Accuracy across transformations
 - ImageNet transfer experiments
 - Performance comparisons between supervised, self-supervised, and action-based models
+- Action parameter ablation analysis
 
 Most plots in the thesis that evaluate classification performance, generalization performance, or robustness are generated from this folder.
 
@@ -106,40 +107,6 @@ Example result types:
 - Adjacent cosine similarity plots
 - Embedding principal component correlation analysis
 - Comparison of supervised, self-supervised, and action-based representations
-- Analysis of which action parameters provide the strongest learning signal
-
----
-
-## How to Navigate the Repository
-
-The easiest way to find a file is to start from the corresponding part of the thesis.
-
-| Thesis part | Folder |
-|---|---|
-| Dataset generation and MAPS setup | `MAPS_generation/` |
-| Model training | `MAPS_Training/` |
-| Classification performance and robustness | `Training and Testing Performance/` |
-| PCA, PaCMAP, embeddings, and action analysis | `Representation Analysis/` |
-
----
-
-## General Workflow
-
-The overall experimental pipeline follows this structure:
-
-```text
-1. Generate or prepare MAPS data
-   → MAPS_generation/
-
-2. Train models
-   → MAPS_Training/
-
-3. Evaluate training and test performance
-   → Training and Testing Performance/
-
-4. Analyze learned representations
-   → Representation Analysis/
-```
 
 ---
 
@@ -166,4 +133,4 @@ For reproducibility, the recommended order is:
 3. Run the performance evaluation scripts.
 4. Run the representation analysis and visualization scripts.
 
-Large generated files, intermediate outputs, model checkpoints, or datasets may not be included in this repository depending on storage limitations.
+Large generated files, intermediate outputs, model checkpoints, or datasets are not be included in this repository but can be provided if requested.
